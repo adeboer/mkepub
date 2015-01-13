@@ -1,0 +1,58 @@
+MKEPUB(1)             User Contributed Perl Documentation            MKEPUB(1)
+
+
+
+[1mNAME[0m
+       mkepub - simple tool to convert XHTML to EPUB
+
+[1mSYNOPSIS[0m
+       mkepub [ -a author | -f firstname -l lastname ] -t title [ -i
+       cover-.jpeg ] basename
+
+[1mDESCRIPTION[0m
+       [1mmkepub [22mconverts an XHTML document or document tree into an EPUB file.
+
+       For a given basename [4mfoo[24m it looks for either a directory named [4mfoo[0m
+       which must contain all the documents (including illustrations and
+       styling: GIF, JPEG, PNG, SVG, and CSS are supported), or a file named
+       [4mfoo.html[24m if only a single unadorned file is to be converted.  There
+       must be a cover image which should normally be called [4mfoo.jpeg[24m.  It
+       will produce [4mfoo.epub[24m as output.
+
+       The file list of a [4mfoo[24m directory will be sorted lexically and
+       recursively, with [4mindex.html[24m files being sorted to the start of their
+       directory, so the one in the base directory will be the first page of
+       the book.
+
+[1mOPTIONS[0m
+       -a author
+           Specify an author, typically when it is an entity or role account.
+           Use either this OR the [4m-f[24m/[4m-l[24m pair.
+
+       -f firstname
+           The first name of the author.  Use with [4m-l[24m to get [4mfirstname[0m
+           [4mlastname[24m and [4mlastname,[24m [4mfirstname[24m in appropriate contexts.
+
+       -i coverimage
+           Specify a JPEG cover image of other than the default filename.
+
+       -l lastname
+           The last name of the author.
+
+       -t title
+           Specify the title text for the ebook (usually in quotes!).
+
+[1mSEE ALSO[0m
+       <http://idpf.org/epub/201>
+
+       (Currently targetting the stable past release and not the bleeding-
+       edge.)
+
+       <http://wiki.mobileread.com/wiki/Main_Page>
+
+[1mAUTHOR[0m
+       Anthony de Boer [4m<adb@adb.ca[24m>
+
+
+
+perl v5.18.2                      2015-01-12                         MKEPUB(1)
