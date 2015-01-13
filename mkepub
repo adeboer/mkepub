@@ -1,0 +1,291 @@
+#!/usr/bin/perl -w
+use strict;
+use Data::UUID;
+use Image::ExifTool qw(:Public);
+use File::Temp qw/ tempdir /;
+use Getopt::Std;
+
+=pod
+
+=head1 NAME
+
+mkepub - simple tool to convert XHTML to EPUB
+
+=head1 SYNOPSIS
+
+mkepub [ -a author | -f firstname -l lastname ]
+-t title [ -i cover-.jpeg ] basename
+
+=head1 DESCRIPTION
+
+B<mkepub> converts an XHTML document or document tree into an EPUB
+file.
+
+For a given basename I<foo> it looks for either a directory named I<foo>
+which must contain all the documents (including illustrations and
+styling: GIF, JPEG, PNG, SVG, and CSS are supported), or a file named
+I<foo.html> if only a single unadorned file is to be converted.
+There must be a cover image which should normally be called I<foo.jpeg>.
+It will produce I<foo.epub> as output.
+
+The file list of a I<foo> directory will be sorted lexically and
+recursively, with I<index.html> files being sorted to the start of their
+directory, so the one in the base directory will be the first page of the
+book.  
+
+=head1 OPTIONS
+
+=over
+
+=item -a author
+
+Specify an author, typically when it is an entity or role account.
+Use either this OR the I<-f>/I<-l> pair.
+
+=item -f firstname
+
+The first name of the author.  Use with I<-l> to get I<firstname lastname>
+and I<lastname, firstname> in appropriate contexts.
+
+=item -i coverimage
+
+Specify a JPEG cover image of other than the default filename.
+
+=item -l lastname
+
+The last name of the author.
+
+=item -t title
+
+Specify the title text for the ebook (usually in quotes!).
+
+=back
+
+=head1 SEE ALSO
+
+L<http://idpf.org/epub/201>
+
+(Currently targetting the stable past release and not the bleeding-edge.)
+
+L<http://wiki.mobileread.com/wiki/Main_Page>
+
+=head1 AUTHOR
+
+Anthony de Boer I<<adb@adb.ca>>
+
+=cut
+
+my %opts;
+
+sub usage {
+	print STDERR "Usage: mkepub [ -a author | -f firstname -l lastname ]\n";
+	print STDERR "  -t title [ -i cover-.jpeg ] basename\n";
+	exit 2;
+}
+
+getopts('a:f:l:t:i:', \%opts) || &usage;
+usage unless scalar(@ARGV) == 1;
+
+my $basename = shift(@ARGV);
+my %meta;
+my $prefixdir = '';
+my $prefixcut = 0;
+my $docroot;
+$meta{ident} = $basename;
+
+if (-d $basename) {
+	$docroot = $basename;
+	$prefixdir = $basename;
+	$prefixdir .= "/" unless $prefixdir =~ /\/$/;
+	$prefixcut = length($prefixdir);
+} elsif (-s "$basename.html") {
+	$docroot ="$basename.html";
+} else {
+	die "$0: cannot find $basename subdir or $basename.html\n";
+}
+
+if ($opts{a} && !$opts{f} && !$opts{l}) {
+	$meta{author} = $opts{a};
+	$meta{asort} = $opts{a};
+} elsif (!$opts{a} && $opts{f} && $opts{l}) {
+	$meta{author} = "$opts{f} $opts{l}";
+	$meta{asort} = "$opts{l}, $opts{f}";
+} else {
+	die "$0: must use either -a author or -f firstname and -l lastname\n";
+}
+
+if ($opts{t}) {
+	$meta{title} = $opts{t};
+} else {
+	die "$0: need -t \"title of document\"\n";
+}
+
+# cover image: apparently has to be a jpeg
+my $coverimg = $opts{i} || "basename.jpeg";
+-s "$coverimg" || die "No $coverimg (needed as cover image)\n";
+my $info = ImageInfo("$coverimg");
+die "Cannot parse image dimensions\n" unless $$info{ImageHeight} && $$info{ImageWidth};
+$meta{cwidth} = $$info{ImageWidth};
+$meta{cheight} = $$info{ImageHeight};
+
+# needed for CSS
+$meta{page} = '@page';
+
+my @files = sort map { chomp; s/\/index.html$/\//; substr($_, $prefixcut); } qx(find $docroot -type f -print);
+
+die "No files specified at doc\n" unless scalar(@files);
+
+sub path {
+	my ($f) = @_;
+	$f = "$prefixdir$f";
+	$f .= "index.html" if $f =~ /\/$/;
+	return $f;
+}
+
+my %medsuf = qw/jpeg image\/jpeg html application\/xhtml+xml css text\/css png image\/png gif image\/gif svg image\/svg+xml/;
+
+sub mediatype {
+	my ($f) = @_;
+	my $m;
+	$m = $medsuf{$1} if $f =~ /(\w+)$/;
+	$m = "application/octet-stream" unless $m;
+	return $m;
+}
+
+my $idno = 0;
+my @pgids;
+$meta{itemlist} = join("\n", map { my $rn = &path($_); $idno++; my $id = "id$idno"; push(@pgids, $id) if $rn =~ /\.html$/; my $mt = &mediatype($rn); "<item href=\"$rn\" id=\"$id\" media-type=\"$mt\" />"; } @files);
+
+$meta{itemref} = join("\n", map { "<itemref idref=\"$_\" />"; } @pgids);
+
+$idno = 0;
+$meta{navpoints} = join("\n", map { my $rn = &path($_); $rn =~ /\.html$/ ? &navpoint($_, $rn, $idno++) : (); } @files);
+
+sub navpoint {
+	my ($f, $rn, $id) = @_;
+	my $lb = $f ? $f : "Root Index";
+	return "<navPoint id=\"a$id\" playOrder=\"$id\">\n<navLabel><text>$lb</text></navLabel>\n<content src=\"$rn\" />\n</navPoint>";
+}
+
+# creation timestamp in format 0101-01-01T00:00:00+00:00
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime(time);
+$meta{date} = sprintf("%04d-%02d-%02dT%02d:%02d:%02d+00:00", $year+1900, $mon+1, $mday, $hour, $min, $sec);
+
+# randomly pick a UUID
+$meta{uuid} = Data::UUID->new->create_str();
+$meta{uuid} =~ y/A-Z/a-z/;
+
+# print STDERR "$_: $meta{$_}\n" for sort keys %meta;
+
+# ------------------
+# START WORKING HERE
+# ------------------
+
+my $tempdir = tempdir( CLEANUP => 1 );
+mkdir("$tempdir/META-INF") || die "Cannot mkdir $tempdir/META-INF: $!\n";
+
+my $genfiles;
+while(<DATA>) {
+	if (/^\@\@\s+(\S+)/) {
+		open(OO, ">$tempdir/$1") || die "Cannot write $1: $!\n";
+		$genfiles .= " " . $1;
+		next;
+	}
+	s/\@(\w+)/$meta{$1} || print STDERR "$1 undef?\n";/ge;
+	print OO;
+}
+
+my $includejpeg = "";
+if ($coverimg eq "$basename.jpeg") {
+	$includejpeg = $coverimg;
+} else {
+	system("cp $coverimg $tempdir/$basename.jpeg") && die "Cannot copy $coverimg\n";
+	$genfiles .= " $basename.jpeg";
+}
+
+system("(cd $tempdir && zip -rqX -$genfiles) > $basename.epub") && die "first zip failed\n";
+system("zip -rqX $basename.epub $includejpeg $docroot") && die "second zip failed\n";
+
+__DATA__
+@@ mimetype
+application/epub+zip
+@@ META-INF/container.xml
+<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles>
+<rootfile full-path="content.opf" media-type="application/oebps-package+xml" />
+
+</rootfiles>
+</container>
+@@ content.opf
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">
+<metadata xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:creator opf:file-as="@asort" opf:role="aut">@author</dc:creator>
+<dc:date>@date</dc:date>
+<dc:identifier id="uuid_id" opf:scheme="uuid">@uuid</dc:identifier>
+<dc:language>en</dc:language>
+<dc:title>@title</dc:title>
+<meta name="cover" content="cover" />
+</metadata>
+<manifest>
+<item href="@ident.jpeg" id="cover" media-type="image/jpeg" />
+<item href="page_styles.css" id="page_css" media-type="text/css" />
+<item href="stylesheet.css" id="css" media-type="text/css" />
+<item href="titlepage.xhtml" id="titlepage" media-type="application/xhtml+xml" />
+<item href="toc.ncx" media-type="application/x-dtbncx+xml" id="ncx" />
+@itemlist
+</manifest>
+<spine toc="ncx">
+<itemref idref="titlepage" />
+@itemref
+</spine>
+<guide>
+<reference href="titlepage.xhtml" type="cover" title="Cover" />
+</guide>
+</package>
+@@ page_styles.css
+@page {
+	margin-bottom: 5pt;
+	margin-top: 5pt;
+} 
+@@ stylesheet.css
+@page {
+	margin-bottom: 5pt;
+	margin-top: 5pt;
+} 
+@@ titlepage.xhtml
+<?xml version='1.0' encoding='utf-8'?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Cover</title>
+<style type="text/css" title="override_css">
+@page { padding: 0pt; margin: 0pt; }
+body { text-align: center; padding: 0pt; margin: 0pt; }
+</style>
+</head>
+<body>
+<div>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="100%" height="100%" viewBox="0 0 @cwidth @cheight" preserveAspectRatio="xMidYMid meet">
+<image width="@cwidth" height="@cheight" xlink:href="@ident.jpeg" />
+</svg>
+</div>
+</body>
+</html>
+@@ toc.ncx
+<?xml version='1.0' encoding='utf-8'?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="eng">
+<head>
+<meta name="dtb:uid" content="@uuid" />
+<meta name="dtb:depth" content="2" />
+<meta name="dtb:generator" content="mkepub (0.1)" />
+<meta name="dtb:totalPageCount" content="0" />
+<meta name="dtb:maxPageNumber" content="0" />
+</head>
+<docTitle><text>@title</text></docTitle>
+<docAuthor><text>@author</text></docAuthor>
+<navMap>
+@navpoints
+</navMap>
+</ncx>
