@@ -1,58 +1,51 @@
-MKEPUB(1)             User Contributed Perl Documentation            MKEPUB(1)
+NAME
+    mkepub - simple tool to convert XHTML to EPUB
 
+SYNOPSIS
+    mkepub [ -a author | -f firstname -l lastname ] -t title [ -i
+    cover-.jpeg ] basename
 
+DESCRIPTION
+    mkepub converts an XHTML document or document tree into an EPUB file.
 
-[1mNAME[0m
-       mkepub - simple tool to convert XHTML to EPUB
+    For a given basename *foo* it looks for either a directory named *foo*
+    which must contain all the documents (including illustrations and
+    styling: GIF, JPEG, PNG, SVG, and CSS are supported), or a file named
+    *foo.html* if only a single unadorned file is to be converted. There
+    must be a cover image which should normally be called *foo.jpeg*. It
+    will produce *foo.epub* as output.
 
-[1mSYNOPSIS[0m
-       mkepub [ -a author | -f firstname -l lastname ] -t title [ -i
-       cover-.jpeg ] basename
+    The file list of a *foo* directory will be sorted lexically and
+    recursively, with *index.html* files being sorted to the start of their
+    directory, so the one in the base directory will be the first page of
+    the book.
 
-[1mDESCRIPTION[0m
-       [1mmkepub [22mconverts an XHTML document or document tree into an EPUB file.
+OPTIONS
+    -a author
+        Specify an author, typically when it is an entity or role account.
+        Use either this OR the *-f*/*-l* pair.
 
-       For a given basename [4mfoo[24m it looks for either a directory named [4mfoo[0m
-       which must contain all the documents (including illustrations and
-       styling: GIF, JPEG, PNG, SVG, and CSS are supported), or a file named
-       [4mfoo.html[24m if only a single unadorned file is to be converted.  There
-       must be a cover image which should normally be called [4mfoo.jpeg[24m.  It
-       will produce [4mfoo.epub[24m as output.
+    -f firstname
+        The first name of the author. Use with *-l* to get *firstname
+        lastname* and *lastname, firstname* in appropriate contexts.
 
-       The file list of a [4mfoo[24m directory will be sorted lexically and
-       recursively, with [4mindex.html[24m files being sorted to the start of their
-       directory, so the one in the base directory will be the first page of
-       the book.
+    -i coverimage
+        Specify a JPEG cover image of other than the default filename.
 
-[1mOPTIONS[0m
-       -a author
-           Specify an author, typically when it is an entity or role account.
-           Use either this OR the [4m-f[24m/[4m-l[24m pair.
+    -l lastname
+        The last name of the author.
 
-       -f firstname
-           The first name of the author.  Use with [4m-l[24m to get [4mfirstname[0m
-           [4mlastname[24m and [4mlastname,[24m [4mfirstname[24m in appropriate contexts.
+    -t title
+        Specify the title text for the ebook (usually in quotes!).
 
-       -i coverimage
-           Specify a JPEG cover image of other than the default filename.
+SEE ALSO
+    <http://idpf.org/epub/201>
 
-       -l lastname
-           The last name of the author.
+    (Currently targetting the stable past release and not the
+    bleeding-edge.)
 
-       -t title
-           Specify the title text for the ebook (usually in quotes!).
+    <http://wiki.mobileread.com/wiki/Main_Page>
 
-[1mSEE ALSO[0m
-       <http://idpf.org/epub/201>
+AUTHOR
+    Anthony de Boer *<adb@adb.ca*>
 
-       (Currently targetting the stable past release and not the bleeding-
-       edge.)
-
-       <http://wiki.mobileread.com/wiki/Main_Page>
-
-[1mAUTHOR[0m
-       Anthony de Boer [4m<adb@adb.ca[24m>
-
-
-
-perl v5.18.2                      2015-01-12                         MKEPUB(1)
